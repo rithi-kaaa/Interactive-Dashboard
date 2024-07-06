@@ -1,7 +1,7 @@
-#*apikey.py
+*apikey.py
 /venv
 /__pycache__
 *.pyc
 .idea/
-readme_private.txt
+i40ncConfig.yml
 /chroma
