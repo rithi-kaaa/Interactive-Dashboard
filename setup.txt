@@ -1,10 +1,12 @@
 Pycharm Setup
-(1) Clone project using GitKraken (connect to github then looks for porject)
+(0) Create Github account, give Dr.Chia your github email. Chia add you to the project "i40NerveCentre".
+(1) Clone project using GitKraken (connect to github then looks for projec name)
 (2) Open project in pycharm>setting>add interpreter> add virtual environment
 (3) Installing packages
 (4) Try tun the streamlit app from PyCharm terminal: To run the app(from command line):
      PS D:\TPProjects\i40nervecentre> streamlit run i40nc.py
-(5) Branch out using GitKraken > Start to code your part
+(5) Branch out using GitKraken >name the branch as "<name>Branch" e.g. "AmiraBranch" 
+(6) Show Dr.Chia you set up and can run the web app correctly > start to code
 
 Potential Errors and resolution:
 (1) 'cryptography' package is required for sha256_password or caching_sha2_password auth methods
