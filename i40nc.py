@@ -42,6 +42,7 @@ pf_tab, pp_tab, an_tab, sd_tab, st_tab= st.tabs(["Production Floor", "Past Perfo
 
 with pf_tab:
     st.write("(Scope1)Put your production floor overview page here! All the best!(OEE/ carbon footprint)")
+    st.text_area("create programing here")
 
 with pp_tab:
     st.write("(Scope2)Put your past performance page here! All the best!(historical page)")
