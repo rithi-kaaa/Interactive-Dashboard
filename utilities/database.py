@@ -7,6 +7,9 @@ from datetime import datetime, timedelta
 import pandas as pd
 from sqlalchemy import create_engine, select, Table
 import numpy as np
+import yaml
+import os
+import pandas as pd
 
 
 def getMostRecentUpdatedDT(database, tableName):
@@ -61,6 +64,23 @@ def getMmmPortfoliosBySeq(database, tablename, modelid, seq):
     cols = ["id","modelid","seq","match_ts","portfolio"]
     return portfoliosRecordsDF[cols]
 
+
+def Test1():
+    with open("D:\\TPProjects\\i40nervecentre\\i40ncConfig.yml") as cfgfile:
+        config = yaml.load(cfgfile, Loader=yaml.FullLoader)
+        dbConfig = config["Mysql-i40nc"]
+
+        database = dbConfig["dbname"]
+        user = dbConfig["user"]
+        pwd = dbConfig["pwd"]
+        host = dbConfig["uri"]
+        port = dbConfig["port"]
+
+
+    i40db = create_engine('mysql+pymysql://' + user + ':' + pwd + '@' + host + ':' + str(port) + '/' + database , echo=False)
+    tablename="Pressure"
+    df= pd.read_sql_query("SELECT * FROM %s" % tablename,i40db.connect())
+    print("end")
 
 
 
