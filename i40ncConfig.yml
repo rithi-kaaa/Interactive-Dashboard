@@ -8,4 +8,9 @@ Mysql-i40nc:
     uri: "localhost"
     port: "3306"
 
-
+Mock-database:
+    dbname: "i40nc"
+    user: "root"
+    pwd: "tG064915"
+    uri: "127.0.0.1"
+    port: 3306

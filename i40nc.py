@@ -7,11 +7,10 @@ from sqlalchemy import create_engine
 import pymysql
 import pandas as pd
 from openai import OpenAI
-import mysql.connector
-from mysql.connector import Error
+import requests
 
 ## Setup
-os.environ["OPENAI_API_KEY"] = apikey
+#os.environ["OPENAI_API_KEY"] = "sk-proj-acnvG3rYugMz7GYan7oYT3BlbkFJAJtssJMo9iJQ0rvk245i"
 wd = os.getcwd()
 with open(wd+"\\i40ncConfig.yml") as cfgfile:
     config = yaml.load(cfgfile, Loader=yaml.FullLoader)
@@ -49,106 +48,91 @@ with pp_tab:
     st.write("(Scope2)Put your past performance page here! All the best!(historical page)")
 
 with an_tab:
-    db_tab, llm_tab = st.tabs(["Database Queries using OpenAI", "General ChatGT"])
-    with db_tab:
-        # Function to read the YAML file and get the database config
-        def load_db_config(file_path):
-            with open(file_path, 'r') as file:
-                config = yaml.load(file, Loader=yaml.FullLoader)
-            mock_config = config["Mock-database"]
-            return mock_config
-
-
-        # Function to connect to the MySQL database
-        def create_connection(config):
-            connection = None
-            try:
-                connection = mysql.connector.connect(
-                    host=config['uri'],
-                    user=config['user'],
-                    passwd=config['pwd'],
-                    database=config['dbname'],
-                    port=config['port']
-                )
-                st.success("Connection to MySQL DB successful")
-            except Error as e:
-                st.error(f"The error '{e}' occurred")
-            return connection
-
-        # Function to get table names from the database
-        def get_tables(connection):
-            query = "SHOW TABLES"
-            cursor = connection.cursor()
-            tables = []
-            try:
-                cursor.execute(query)
-                tables = cursor.fetchall()
-            except Error as e:
-                st.error(f"The error '{e}' occurred")
-            return tables
-
-        # Load database configuration from YAML file
-        config_file_path = os.path.join(wd, "i40ncConfig.yml")
-        mock_config = load_db_config(config_file_path)
-
-        # Button to connect to the database
-        if st.button("Connect to Database"):
-            connection = create_connection(mock_config)
-            if connection:
-                st.session_state.connection = connection
-
-        # If connected, retrieve and display the number and names of tables
-        if "connection" in st.session_state and st.session_state.connection:
-            tables = get_tables(st.session_state.connection)
-            if tables:
-                table_names = [table[0] for table in tables]
-                st.write(f"Number of tables: {len(table_names)}")
-                st.write("Table names:")
-                for table_name in table_names:
-                    st.write(f"- {table_name}")
-
-    with llm_tab:
-        st.title("NerCy Chatbot")
+    st.title("NerCy Chatbot")
 
     # ChatGPT Setup
-    #client = OpenAI(api_key="sk-proj-acnvG3rYugMz7GYan7oYT3BlbkFJAJtssJMo9iJQ0rvk245i")
+    client = OpenAI(api_key="sk-proj-acnvG3rYugMz7GYan7oYT3BlbkFJAJtssJMo9iJQ0rvk245i")
 
-        # Set a default model
-        if "openai_model" not in st.session_state:
-            st.session_state["openai_model"] = "gpt-3.5-turbo"
+    # Function to display chat messages
+    def display_messages():
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-        # Function to display chat messages
-        def display_messages():
-            for message in st.session_state.messages:
-                with st.chat_message(message["role"]):
-                    st.markdown(message["content"])
+    # Function to send prompts to AnythingLLM
+    def post_request(link, data_info, headers=None):
+        try:
+            reply = requests.post(link, json=data_info, headers=headers)
+            reply.raise_for_status()  # Raise an exception for HTTP errors
+            return reply.json()  # Assuming the response is in JSON format
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return None
 
+    # Initialize chat history
+    if 'messages' not in st.session_state:
+        st.session_state.messages = [
+            {'role': 'assistant', 'content': 'Hi, I am NerCy the chatbot built to answer any questions you may have! I '
+                                             'can answer general questions or use an agent to access tools such as the '
+                                             'database and the internet to answer more complicated questions. However, '
+                                             'in order to access the agent to use the tools mentions, please add @agent'
+                                             ' in front of the prompt. A few examples are provided in the default '
+                                             'prompts. We apologize for any inconvenience caused.'}
+        ]
 
-        # Initialize chat history
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    if 'selected_prompt' not in st.session_state:
+        st.session_state.selected_prompt = ''
 
-        # Display chat messages from history on app rerun
+    # Display chat history on app rerun in container
+    with st.container(height=500):
         display_messages()
 
-        if prompt := st.chat_input("Please type your questions here!"):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            response = client.chat.completions.create(
-                model=st.session_state["openai_model"],
-                messages=[
-                    {"role": m["role"], "content": m["content"]}
-                    for m in st.session_state.messages
-                 ],
-                stream=False,  # Set stream to False to get the full response at once
-                )
-            # Extract the assistant's response content
-            assistant_message = response.choices[0].message.content
-            st.session_state.messages.append({"role": "assistant", "content": assistant_message})
-            st.rerun()  # Rerun the script to clear the displayed messages
+    additional_context = ('Check the following prompt to see if it requires the use of an agent and if it does '
+                          'return True. Do not return any other words other then True if it does require an agent. '
+                          'If it does not require an agent respond to the best of your ability without using an '
+                          'agent. Prompt: ')
 
-        # Clear chat button
-        if st.button("Clear Chat"):
-            st.session_state.messages = []
+    assistant_message_agent = 'Null'
+
+    # Capture user input
+    prompt = st.text_input("Please type your questions here!", value=st.session_state.selected_prompt)
+
+    # List of default prompts with custom configurations
+    default_prompts = [
+        {'label': 'Use Case & Purpose', 'prompt': 'What is the use case and purpose of this chatbot?'},
+        {'label': 'Database Tables Available', 'prompt': '@agent Tell me the tables present in the database?'},
+        {'label': 'Slack Info', 'prompt': '@agent What is Slack and provide me some links for additional information?'}
+    ]
+
+    if prompt:
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        st.session_state.selected_prompt = ''
+        url_3 = 'http://localhost:3001/api/v1/workspace/major-project/chat'
+        data_3 = {'message': additional_context + prompt, 'mode': 'chat'}
+        headers_3 = {'Authorization': 'Bearer K8QE7DN-5AVMERW-PVFP5N7-9HRMVZ7', 'Accept': 'application/json'}
+        response_data_3 = post_request(url_3, data_3, headers_3)
+        assistant_message = response_data_3['textResponse']
+        if assistant_message == 'True':
+            data_agent = {'message': '@agent Using the most suitable function complete the following prompt: '
+                          + prompt, 'mode': 'chat'}
+            response_data_agent = post_request(url_3, data_agent, headers_3)
+            assistant_message_agent = response_data_agent['textResponse']
+        if assistant_message_agent != 'Null':
+            st.session_state.messages.append({"role": "assistant", "content": assistant_message_agent})
+        else:
+            st.session_state.messages.append({"role": "assistant", "content": assistant_message})
+        st.rerun()  # Rerun the script to display messages
+
+    # Create a horizontal layout for the buttons
+    cols = st.columns(len(default_prompts))
+
+    # Buttons to apply the selected default prompt to the chat input
+    for i, prompt_info in enumerate(default_prompts):
+        with cols[i]:  # Place each button in its respective column
+            if st.button(prompt_info["label"]):
+                st.session_state.selected_prompt = prompt_info['prompt']
+                st.rerun()
+
 
 with sd_tab:
     st.write("(Scope4)Put your smart detect page here! All the best!(abrnomally detection)")
