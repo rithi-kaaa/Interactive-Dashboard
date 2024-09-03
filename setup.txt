@@ -5,7 +5,7 @@ Pycharm Setup
 (3) Installing packages
 (4) Try tun the streamlit app from PyCharm terminal: To run the app(from command line):
      PS D:\TPProjects\i40nervecentre> streamlit run i40nc.py
-(5) Branch out using GitKraken >name the branch as "<name>Branch" e.g. "AmiraBranch" 
+(5) Branch out using GitKraken >name the branch as "<name>Branch" e.g. "AmiraBranch"
 (6) Show Dr.Chia you set up and can run the web app correctly > start to code
 
 Potential Errors and resolution:
