@@ -2,10 +2,15 @@ Slack-Client:
     i40_alert: "xoxb-573436606260-4613742840116-WuC4mAOt928FmpJgxyhkpYFY"
 
 Mysql-i40nc:
-    dbname: "world"
+    dbname: "i40ncv1"
     user: "dbadmin"
-    pwd: "mysql?password"
+    pwd: "mYsql?945"
+    uri: "localhost"
+    port: "3306"
+
+Mock-database:
+    dbname: "i40nc"
+    user: "root"
+    pwd: "tG064915"
     uri: "127.0.0.1"
     port: 3306
-
-
