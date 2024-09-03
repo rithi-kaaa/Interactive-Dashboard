@@ -1,7 +1,5 @@
 import os
-
 from sklearn.preprocessing import StandardScaler
-
 from apikey import apikey
 import streamlit as st
 from i40ncAssistant import i40NCAssistant
@@ -11,47 +9,247 @@ import pymysql
 import pandas as pd
 from openai import OpenAI
 import requests
+import matplotlib.pyplot as plt
+import plotly.graph_objs as go
+from datetime import datetime, timedelta
 
-## Setup
-#os.environ["OPENAI_API_KEY"] = "sk-proj-acnvG3rYugMz7GYan7oYT3BlbkFJAJtssJMo9iJQ0rvk245i"
+# Setup database connection
 wd = os.getcwd()
-with open(wd+"\\i40ncConfig.yml") as cfgfile:
+with open(wd + "\\i40ncConfig.yml") as cfgfile:
     config = yaml.load(cfgfile, Loader=yaml.FullLoader)
     dbConfig = config["Mysql-i40nc"]
-
     database = dbConfig["dbname"]
     user = dbConfig["user"]
     pwd = dbConfig["pwd"]
     host = dbConfig["uri"]
     port = dbConfig["port"]
 
-    i40db = create_engine('mysql+pymysql://' + user + ':' + pwd + '@' + host + ':' + str(port) + '/' + database , echo=False)
-    #Connection and data capturing tested ok
-    #cityDF = pd.read_sql('SELECT * FROM city', i40db)
-    #print(cityDF)
+i40db = create_engine(f'mysql+pymysql://{user}:{pwd}@{host}:{port}/{database}', echo=False)
 
+# Streamlit app setup
+st.set_page_config(page_title="I4.0 Smart Factory Nerve Centre", layout="wide")
 
-st.title("I4.0 Smart Factory Nerve Centre")
-## Session Setup/initialisation
-if 'nca' not in st.session_state:
-    st.session_state["nca"] = i40NCAssistant(i40db, config)
-if 'uiStates' not in st.session_state:
-    st.session_state['uiStates'] = {}
+# Custom CSS for centering the tabs and making them wider
+st.markdown("""
+    <style>
+        .centered-title {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            margin-bottom: -10px;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            justify-content: space-evenly;
+        }
+        .stTabs [role="tab"] {
+            flex-grow: 1;
+            padding: 16px;
+        }
+        .date-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .date-container div {
+            margin-right: 20px;
+        }
+    </style>
+    <div class="centered-title">
+        <h1>I4.0 Smart Factory Nerve Centre</h1>
+    </div>
+    """, unsafe_allow_html=True)
 
-## UI Setup
-nca = st.session_state["nca"]
-states = st.session_state['uiStates']
-pf_tab, pp_tab, an_tab, sd_tab, st_tab= st.tabs(["Production Floor", "Past Performance", "Ask NerCy", "Smart Detect","Smart Tools"])
+# Tabs with icons for different sections
+tab_titles = [
+    "🛠️ Production Floor",
+    "📊 Past Performance",
+    "🤖 Ask NerCy",
+    "🔍 Smart Detect",
+    "🔧 Smart Tools"
+]
+tabs = st.tabs(tab_titles)
 
+# Get the latest date in the data
+query_latest_date = "SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM i40nc.oee_log3"
+latest_date = pd.read_sql(query_latest_date, i40db)['latest_date'][0]
 
-with pf_tab:
-    st.write("(Scope1)Put your production floor overview page here! All the best!(OEE/ carbon footprint)")
-    st.text_area("create programing here")
+# Date selector
+selected_date = st.date_input("Select Date:", latest_date)
 
-with pp_tab:
-    st.write("(Scope2)Put your past performance page here! All the best!(historical page)")
+# Query data from MySQL for the selected date (OEE data)
+query_oee = f"""
+SELECT * FROM i40nc.oee_log3
+WHERE DATE(Time_Stamp) = '{selected_date}'
+"""
+oee_data = pd.read_sql(query_oee, i40db)
 
-with an_tab:
+# Query data from MySQL for the last 7 days (Machine resources data)
+start_date = selected_date - timedelta(days=7)
+query_resources_7days = f"""
+SELECT * FROM i40nc.machine_resources_latest
+WHERE DATE(FROM_UNIXTIME(Time_Stamp_ms/1000)) BETWEEN '{start_date}' AND '{selected_date}'
+"""
+resources_data_7days = pd.read_sql(query_resources_7days, i40db)
+
+# Ensure the timestamp columns are in datetime format
+oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
+resources_data_7days['Time_Stamp_ms'] = pd.to_datetime(resources_data_7days['Time_Stamp_ms'], unit='ms')
+
+# Set the Time_Stamp_ms as the index for resampling
+resources_data_7days.set_index('Time_Stamp_ms', inplace=True)
+
+# Aggregate CO2 emissions per day over the last 7 days
+daily_co2_emissions = resources_data_7days.resample('D').sum().reset_index()
+daily_co2_emissions['CO2_Emissions'] = (
+    daily_co2_emissions['kWh_actual_with_sim'] * 0.233 +
+    daily_co2_emissions['Comp_Air_Totalized'] * 2.31 +
+    daily_co2_emissions['Water_Totalized'] * 0.0003
+)
+
+# Set values based on the data
+availability = oee_data['OEE_Availability'].mean()  # Already in percentage form
+performance = oee_data['OEE_Performance'].mean()  # Already in percentage form
+quality = oee_data['OEE_Quality'].mean()  # Already in percentage form
+oee = (availability * performance * quality) / 10000  # OEE calculation as a percentage
+machine_id = "01"
+machine_name = "salineproduction"
+
+# Function to create circular gauges using Plotly with centered numbers
+def create_gauge(value, title):
+    color = "green" if value >= 50 else "red"
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=value,
+        title={'text': title, 'font': {'size': 24}},
+        gauge={
+            'axis': {'range': [0, 100]},
+            'bar': {'color': color, 'thickness': 0.3},
+            'bgcolor': "white",
+            'steps': [
+                {'range': [0, 50], 'color': "lightgray"},
+                {'range': [50, 100], 'color': "gray"}],
+            'threshold': {
+                'line': {'color': color, 'width': 4},
+                'thickness': 0.75,
+                'value': value}},
+        number={'font': {'size': 36, 'color': color}}))
+    fig.update_layout(width=300, height=300, margin=dict(l=20, r=20, t=40, b=20))
+    return fig
+
+# Bar Chart for Availability
+availability_cols = [
+    'A_stop_duration', 'A_Alarm_Duration', 'A_Idle_Duration',
+    'A_Manual_Duration', 'A_Run_Duration'
+]
+
+# Bar Chart for Quality
+quality_cols = [
+    'Q_No_Of_Bad', 'Q_No_Of_Good'
+]
+
+# Layout for Machine Info, Date, and Gauges
+with tabs[0]:  # Production Floor Tab
+    st.markdown("<h2 style='text-align: center;'>OEE and CO2 Monitoring System</h2>", unsafe_allow_html=True)
+
+    st.markdown(f"""
+        <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px;">
+            <div style="flex: 3; text-align: center;">
+                <span style="font-weight: bold;">Machine Information</span>
+                <br/>
+                <span style="color: green;">machineID: {machine_id} | machineName: {machine_name}</span>
+                <br/>
+                <span style="font-weight: bold; color: white;">Date: {selected_date.strftime('%d/%m/%y')}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Layout for the Gauges below the machine info and date
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.plotly_chart(create_gauge(availability, "Availability"), use_container_width=True)
+    with col2:
+        st.plotly_chart(create_gauge(performance, "Performance"), use_container_width=True)
+    with col3:
+        st.plotly_chart(create_gauge(quality, "Quality"), use_container_width=True)
+    with col4:
+        st.plotly_chart(create_gauge(oee, "OEE"), use_container_width=True)
+
+    # Bar Charts for Availability and Quality
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("Availability Breakdown")
+        availability_values = [oee_data[col].sum() for col in availability_cols]
+        plt.figure(figsize=(8, 5))
+        plt.bar(availability_cols, availability_values, color='blue')
+        plt.ylabel('Duration (s)')
+        plt.title('Availability Breakdown')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.pyplot(plt)
+
+    with col2:
+        st.subheader("Quality Breakdown")
+        quality_values = [oee_data[col].sum() for col in quality_cols]
+        plt.figure(figsize=(8, 5))
+        plt.bar(quality_cols, quality_values, color='green', width=0.4)
+        plt.ylabel('Count')
+        plt.title('Quality Breakdown')
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        st.pyplot(plt)
+
+    # CO2 Emissions over the last 7 days
+    col1, col2 = st.columns(2)
+    with col1:
+        st.subheader("CO2 Emissions Over the Last 7 Days")
+        plt.figure(figsize=(10, 5))
+
+        # Check if there's any data to plot
+        if not daily_co2_emissions.empty:
+            plt.plot(daily_co2_emissions['Time_Stamp_ms'], daily_co2_emissions['CO2_Emissions'], label='CO2 Emissions',
+                     color='green')
+            plt.xlabel('Date')
+            plt.ylabel('CO2 Emissions (kg)')
+            plt.title('CO2 Emissions Over the Last 7 Days')
+            plt.grid(True)
+            plt.xticks(rotation=45)
+            plt.legend()
+        else:
+            plt.text(0.5, 0.5, 'No data available for the past 7 days', horizontalalignment='center',
+                     verticalalignment='center', transform=plt.gca().transAxes)
+        st.pyplot(plt)
+
+    with col2:
+        st.subheader("CO2 Emissions Distribution over the Last 7 Days")
+
+        # Sum of CO2 emissions for each resource
+        total_electricity_co2 = resources_data_7days['kWh_actual_with_sim'].sum() * 0.233
+        total_gas_co2 = resources_data_7days['Comp_Air_Totalized'].sum() * 2.31
+        total_water_co2 = resources_data_7days['Water_Totalized'].sum() * 0.0003
+
+        values = [total_electricity_co2, total_gas_co2, total_water_co2]
+        categories = ['Electricity', 'Gas', 'Water']
+        colors = ['green', 'red', 'blue']
+
+        # Check if there's any data to plot
+        if sum(values) > 0:
+            pie_fig = go.Figure(data=[go.Pie(labels=categories, values=values, hole=.3, marker=dict(colors=colors))])
+            st.plotly_chart(pie_fig, use_container_width=True)
+        else:
+            st.markdown("""
+                <div style="display: flex; justify-content: center; align-items: center; height: 300px;">
+                    <p>No data available to display CO2 emissions distribution.</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+# Remaining tabs
+with tabs[1]:  # Past Performance Tab
+    st.write("## Past Performance")
+    st.write("This section will display historical performance metrics and trends.")
+
+with tabs[2]:  # Ask NerCy Tab
     st.title("NerCy Chatbot")
 
     # ChatGPT Setup
@@ -138,13 +336,10 @@ with an_tab:
                 st.rerun()
 
 
-with sd_tab:
-    st.write("(Scope4)Put your smart detect page here! All the best!(abrnomally detection)")
-    import os
-    import pandas as pd
+with tabs[3]:  # Smart Detect Tab
+    st.write("(Scope4) Put your smart detect page here! All the best!(abrnomally detection)")
     import mysql.connector
     import plotly.graph_objects as go
-    import streamlit as st
     from slack_sdk import WebClient
     from slack_sdk.errors import SlackApiError
     import time
@@ -152,7 +347,6 @@ with sd_tab:
 
     # Initialize the Slack client with your Bot User OAuth Token
     client = WebClient(token='xoxb-7628163592884-7628178233924-pnVLhkyUg5eustQB0sEiU3vt')
-
 
     # Function to send an alert to Slack
     def send_slack_alert(message):
@@ -174,7 +368,6 @@ with sd_tab:
             models = joblib.load(file)
         return models
 
-
     # Function to connect to the database
     def connect_to_db():
         return mysql.connector.connect(
@@ -183,7 +376,6 @@ with sd_tab:
             password="root",
             database="i40nc"
         )
-
 
     # Function to fetch all data from the machine_resources_latest table
     def fetch_all_data():
@@ -196,7 +388,6 @@ with sd_tab:
         return pd.DataFrame(data,
                             columns=['Time_Stamp', 'Comp_Air_Totalized', 'Water_Totalized', 'kWh_actual_with_sim'])
 
-
     # Function to fetch new data based on the latest timestamp
     def fetch_new_data(last_timestamp):
         db = connect_to_db()
@@ -207,7 +398,6 @@ with sd_tab:
         db.close()
         return pd.DataFrame(data,
                             columns=['Time_Stamp', 'Comp_Air_Totalized', 'Water_Totalized', 'kWh_actual_with_sim'])
-
 
     # Cache the plot creation function
     @st.cache_data(show_spinner=False)
@@ -259,7 +449,6 @@ with sd_tab:
             )
         )
         return fig
-
 
     # Streamlit app
     def main():
@@ -424,28 +613,8 @@ with sd_tab:
                         st.session_state.stop_signal = True
                         st.write("Anomaly detection stopped.")
 
-
     if __name__ == '__main__':
         main()
 
-with st_tab:
-    st.write("(Scope5)Put your smart tools page here! All the best!(generate pdf report/ email report/ slack notification)")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+with tabs[4]:  # Smart Tools Tab
+    st.write("(Scope5) Put your smart tools page here! All the best!(generate pdf report/ email report/ slack notification)")
