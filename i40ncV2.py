@@ -13,6 +13,13 @@ import matplotlib.pyplot as plt
 import plotly.graph_objs as go
 from datetime import datetime, timedelta
 
+import mysql.connector
+import plotly.graph_objects as go
+from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
+import time
+import joblib
+
 # Setup database connection
 wd = os.getcwd()
 with open(wd + "\\i40ncConfig.yml") as cfgfile:
@@ -72,23 +79,20 @@ tab_titles = [
 tabs = st.tabs(tab_titles)
 
 # Get the latest date in the data
-query_latest_date = "SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM i40nc.oee_log3"
+query_latest_date = "SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM %s.oee_log3"%database
 latest_date = pd.read_sql(query_latest_date, i40db)['latest_date'][0]
 
 # Date selector
 selected_date = st.date_input("Select Date:", latest_date)
 
 # Query data from MySQL for the selected date (OEE data)
-query_oee = f"""
-SELECT * FROM i40nc.oee_log3
-WHERE DATE(Time_Stamp) = '{selected_date}'
-"""
+query_oee = "SELECT * FROM %s.oee_log3 WHERE DATE(Time_Stamp) = %s"%(database, selected_date)
 oee_data = pd.read_sql(query_oee, i40db)
 
 # Query data from MySQL for the last 7 days (Machine resources data)
 start_date = selected_date - timedelta(days=7)
 query_resources_7days = f"""
-SELECT * FROM i40nc.machine_resources_latest
+SELECT * FROM {database}.machine_resources_latest
 WHERE DATE(FROM_UNIXTIME(Time_Stamp_ms/1000)) BETWEEN '{start_date}' AND '{selected_date}'
 """
 resources_data_7days = pd.read_sql(query_resources_7days, i40db)
@@ -338,12 +342,6 @@ with tabs[2]:  # Ask NerCy Tab
 
 with tabs[3]:  # Smart Detect Tab
     st.write("(Scope4) Put your smart detect page here! All the best!(abrnomally detection)")
-    import mysql.connector
-    import plotly.graph_objects as go
-    from slack_sdk import WebClient
-    from slack_sdk.errors import SlackApiError
-    import time
-    import joblib
 
     # Initialize the Slack client with your Bot User OAuth Token
     client = WebClient(token='xoxb-7628163592884-7628178233924-pnVLhkyUg5eustQB0sEiU3vt')
@@ -371,10 +369,10 @@ with tabs[3]:  # Smart Detect Tab
     # Function to connect to the database
     def connect_to_db():
         return mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="root",
-            database="i40nc"
+            host=host,
+            user=user,
+            password=pwd,
+            database=database
         )
 
     # Function to fetch all data from the machine_resources_latest table
@@ -453,8 +451,8 @@ with tabs[3]:  # Smart Detect Tab
     # Streamlit app
     def main():
         st.title("Anomaly Detection")
-
-        model_dir = 'C:/School/Poly/MP/mp/i40nc/i40nervecentre/models/'
+        currentDir = os.getcwd()
+        model_dir = '%s/models/'%currentDir
 
         # Initialize session state for selected anomaly and last timestamp
         if 'selected_anomaly' not in st.session_state:
