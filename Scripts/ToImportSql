@@ -1,0 +1,4 @@
+(1) Open DBeaver connect to database
+(2) Open given script in DBeaver, choose connection and database that script need to run upon
+(3) Click execute script: should run for 3,4 minutes.
+(4) See the imported tables: only use  3 final tables oee_log3, machine_resources_latest and machine_resources_co2 , the rest delete
