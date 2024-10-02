@@ -82,12 +82,15 @@ tabs = st.tabs(tab_titles)
 query_latest_date = "SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM %s.oee_log3"%database
 latest_date = pd.read_sql(query_latest_date, i40db)['latest_date'][0]
 
+
 # Date selector
 selected_date = st.date_input("Select Date:", latest_date)
 
 # Query data from MySQL for the selected date (OEE data)
-query_oee = "SELECT * FROM %s.oee_log3 WHERE DATE(Time_Stamp) = %s"%(database, selected_date)
+query_oee = "SELECT * FROM %s.oee_log3 WHERE DATE(Time_Stamp) = '%s'"%(database, selected_date)
 oee_data = pd.read_sql(query_oee, i40db)
+print(query_oee)
+print(oee_data)
 
 # Query data from MySQL for the last 7 days (Machine resources data)
 start_date = selected_date - timedelta(days=7)
