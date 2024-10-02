@@ -1,209 +1,112 @@
-import datetime
-import pandas as pd
+import PDFReport
 from fpdf import FPDF
-import utilities.utils as u
-import numpy as np
+from datetime import datetime
+import traceback
+import pandas as pd
+from statistics import mean
+from statistics import median
+from typing import IO
 
-#Note: dfs=[spotpnls, spotvols, perppnls, perpvols]
-def generateMMHourlyReport(dfs, hourlyReportPathName, reportFontPath):
-    desired_width=300
-    pd.set_option('display.width', desired_width)
-    pd.set_option('display.max_columns',20)
+def detect_outliers(dataframe, column):
+    if column in dataframe.columns and not dataframe[column].empty:
+        q1 = dataframe[column].quantile(0.25)
+        q3 = dataframe[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        return dataframe[(dataframe[column] < lower_bound) | (dataframe[column] > upper_bound)]
+    return pd.DataFrame()  # Return empty DataFrame if column doesn't exist or is empty
 
-    t = datetime.datetime.now()
-    report_time = str(t.date()) + " " + str(t.hour) + ":00"
 
-    #set the pnldfs numbering starts from 1
-    dfs[0].index = np.arange(1, len(dfs[0])+1)
-    dfs[2].index = np.arange(1, len(dfs[2])+1)
+def generate_charts(df, param):
+    pass
 
-    ##Genereate pdf content
-    reportTxtFilepath = hourlyReportPathName.replace("xxx",report_time).replace(".pdf",".txt")
-    f = open(reportTxtFilepath, 'w+')
-    print('Reporting Time: %s UTC+8'%(report_time), file=f)
-    f.write('\r\n')
-    print('MM SPOT PNL', '\n', dfs[0], file=f)
-    f.write('\r\n')
-    print('MM SPOT VOLUME', '\n', dfs[1], file=f)
-    f.write('\r\n')
-    print('MM PERP PNL', '\n', dfs[2], file=f)
-    f.write('\r\n')
-    print('MM PERP VOLUME ', '\n', dfs[3], file=f)
-    f.write('\r\n')
-    f.close()
-    #
-    pdf = FPDF(format=(270, 380))
-    # run this line firstly, then can comment it.
-    pdf.add_font('Consolas4', '', fname=r'%s'%reportFontPath, uni=True)
 
-    # Add a page
+def generate_pdf_report(data):
+    # Convert data to pandas DataFrame
+    df = pd.DataFrame(data)
+
+    # Set default values for potential missing columns
+    kWh_actual_with_sim = df.get('kWh_actual_with_sim', pd.Series([0]))
+    Comp_Air_Totalized = df.get('Comp_Air_Totalized', pd.Series([0]))
+    Water_Totalized = df.get('Water_Totalized', pd.Series([0]))
+
+    # Create a PDF object
+    pdf = PDFReport()
     pdf.add_page()
-    # set style and size of font
-    pdf.set_font('Consolas4', size=7)
 
-    f = open(reportTxtFilepath, "r+")
-    # insert the texts in pdf
-    for x in f:
-        pdf.cell(400, 5, txt=x.replace('\n', ''), ln=1, align='L')
-    reportPdfFilepath = reportTxtFilepath.replace(".txt",".pdf")
-    pdf.output(reportPdfFilepath)
-    pdf.close()
-    u.deleteFile(reportTxtFilepath)
+    # Executive Summary
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, 'Executive Summary', 0, 1)
 
-    ## Generate email content in html
-    # (refering to https://stackoverflow.com/questions/50564407/pandas-send-email-containing-dataframe-as-a-visual-table)
-    emailhtml = """\
-    <html>
-      <head></head>
-      <body>
-        <h3>SPOT PNL</h3>
-        {0}
-        <h3>SPOT VOLUME</h3>
-        {1}
-        <h3>PERP PNL</h3>
-        {2}
-        <h3>PERP VOLUME</h3>
-        {3}
-      </body>
-    </html>
-    """.format(dfs[0].to_html(),dfs[1].to_html(),dfs[2].to_html(),dfs[3].to_html())
-    return reportPdfFilepath, emailhtml
+    total_energy = kWh_actual_with_sim.sum()
+    total_air = Comp_Air_Totalized.sum()
+    total_water = Water_Totalized.sum()
 
-def getDFHtmlForEmail(df):
-    if df is None:
-        return ""
-    dfHtml = df.to_html(classes=None, border=0, justify="right")
-    dfHtml = dfHtml.replace('<tbody>', '<tbody style="text-align: right;">')
-    return dfHtml
+    pdf.set_font('Arial', '', 12)
+    pdf.multi_cell(0, 10, f'Total Energy Consumed: {total_energy:.2f} kWh\n'
+                          f'Total Compressed Air Used: {total_air:.2f} m³\n'
+                          f'Total Water Used: {total_water:.2f} liters\n\n')
 
-#Note: dfs=[spotpnls, spotvols, perppnls, perpvols]
-def generateMMHourlyReportV2(hourlyPnlVolDFs,sodPnlVolDFs,mtdPnlVolDFs,hourlyReportPathName, reportFontPath, reportingEpochs):
-    #### Data Gathering ####
-    #hourly data
-    hourly_spotpnlsDF = hourlyPnlVolDFs[0]
-    hourly_spotvolsDF = hourlyPnlVolDFs[1]
-    hourly_perppnlsDF = hourlyPnlVolDFs[2]
-    hourly_perpvolsDF = hourlyPnlVolDFs[3]
+    # Aggregated Statistics
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, 'Aggregated Statistics', 0, 1)
+    pdf.set_font('Arial', '', 12)
 
-    #sod data
-    spotSODPnlDF, isSpotSODPnlDataComplete = sodPnlVolDFs[0], sodPnlVolDFs[1]
-    spotSODVolDF, isSpotSODVolDataComplete = sodPnlVolDFs[2], sodPnlVolDFs[3]
-    perpSODPnlDF, isPerpSODPnlDataComplete = sodPnlVolDFs[4], sodPnlVolDFs[5]
-    perpSODVolDF, isPerpSODVolDataComplete = sodPnlVolDFs[6], sodPnlVolDFs[7]
+    if not kWh_actual_with_sim.empty:
+        pdf.multi_cell(0, 10, f'Energy Consumption (kWh)\n'
+                              f'- Average: {mean(kWh_actual_with_sim):.2f}\n'
+                              f'- Median: {median(kWh_actual_with_sim):.2f}\n'
+                              f'- Maximum: {kWh_actual_with_sim.max():.2f}\n'
+                              f'- Minimum: {kWh_actual_with_sim.min():.2f}\n\n')
 
-    #mtd data
-    spotMTDPnlDF, isSpotMTDPnlDataComplete = mtdPnlVolDFs[0], mtdPnlVolDFs[1]
-    spotMTDVolDF, isSpotMTDVolDataComplete = mtdPnlVolDFs[2], mtdPnlVolDFs[3]
-    perpMTDPnlDF, isPerpMTDPnlDataComplete = mtdPnlVolDFs[4], mtdPnlVolDFs[5]
-    perpMTDVolDF, isPerpMTDVolDataComplete = mtdPnlVolDFs[6], mtdPnlVolDFs[7]
+    if not Comp_Air_Totalized.empty:
+        pdf.multi_cell(0, 10, f'Compressed Air (m³)\n'
+                              f'- Average: {mean(Comp_Air_Totalized):.2f}\n'
+                              f'- Median: {median(Comp_Air_Totalized):.2f}\n'
+                              f'- Maximum: {Comp_Air_Totalized.max():.2f}\n'
+                              f'- Minimum: {Comp_Air_Totalized.min():.2f}\n\n')
 
-    desired_width=300
-    pd.set_option('display.width', desired_width)
-    pd.set_option('display.max_columns',20)
+    if not Water_Totalized.empty:
+        pdf.multi_cell(0, 10, f'Water Usage (liters)\n'
+                              f'- Average: {mean(Water_Totalized):.2f}\n'
+                              f'- Median: {median(Water_Totalized):.2f}\n'
+                              f'- Maximum: {Water_Totalized.max():.2f}\n'
+                              f'- Minimum: {Water_Totalized.min():.2f}\n\n')
 
-    t = datetime.datetime.now()
-    report_time = str(t.date()) + " " + str(t.hour) + ":00"
+    # Detecting Outliers
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, 'Anomalies Detected', 0, 1)
+    outliers = detect_outliers(df, 'kWh_actual_with_sim')
+    pdf.set_font('Arial', '', 12)
+    if not outliers.empty:
+        for index, row in outliers.iterrows():
+            pdf.multi_cell(0, 10, f"Outlier Detected at {row.get('Time_Stamp', 'N/A')}\n"
+                                  f"- Energy Consumption: {row['kWh_actual_with_sim']:.2f} kWh\n")
+    else:
+        pdf.multi_cell(0, 10, 'No anomalies detected in the energy consumption data.\n\n')
 
-    #set the pnldfs numbering starts from 1
-    hourly_spotpnlsDF.index = np.arange(1, len(hourly_spotpnlsDF)+1)
-    hourly_perppnlsDF.index = np.arange(1, len(hourly_perppnlsDF)+1)
+    # Top N highlights
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, 'Top 5 Highest Energy Consumptions', 0, 1)
+    if not df.empty:
+        top_5_energy = df.nlargest(5, 'kWh_actual_with_sim')
+        pdf.set_font('Arial', '', 12)
+        for index, row in top_5_energy.iterrows():
+            pdf.multi_cell(0, 10, f"Time: {row.get('Time_Stamp', 'N/A')}, Energy: {row['kWh_actual_with_sim']:.2f} kWh\n")
 
-    #### Genereate pdf content ####
-    reportTxtFilepath = hourlyReportPathName.replace("xxx",report_time).replace(".pdf",".txt")
-    f = open(reportTxtFilepath, 'w+')
-    print('Reporting Time: %s UTC+8'%(report_time), file=f)
-    f.write('\r\n')
+    # Visual Summaries - Charts
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, 'Visual Summaries', 0, 1)
 
-    print('SOD:%s to %s'%(u.convertEpochToUTCDT((reportingEpochs["spot-sod"][0][0] / 1000) - (60 * 60)), u.convertEpochToUTCDT(reportingEpochs["spot-sod"][0][1] / 1000)), file=f)
-    print('SPOT', '\n', spotSODPnlDF, file=f)
-    f.write('\r\n')
-    print('\n', spotSODVolDF, file=f)
-    f.write('\r\n')
-    print('PERP', '\n', perpSODPnlDF, file=f)
-    f.write('\r\n')
-    print(perpSODVolDF, file=f)
-    f.write('\r\n')
-    f.write('\r\n')
+    # Add chart for energy consumption if the column exists
+    if 'kWh_actual_with_sim' in df.columns:
+        energy_chart = generate_charts(df, 'kWh_actual_with_sim')
+        pdf.image(energy_chart, x=10, y=None, w=100)
 
-    print('HOURLY:%s to %s'%(u.convertEpochToUTCDT(reportingEpochs["spot-hourly"][0][0]/1000), u.convertEpochToUTCDT(reportingEpochs["spot-hourly"][0][1]/1000)), file=f)
-    print('SPOT', '\n', hourly_spotpnlsDF, file=f)
-    f.write('\r\n')
-    print(hourly_spotvolsDF, file=f)
-    f.write('\r\n')
-    print('PERP', '\n', hourly_perppnlsDF, file=f)
-    f.write('\r\n')
-    print(hourly_perpvolsDF, file=f)
-    f.write('\r\n')
-    f.write('\r\n')
+    # Save PDF
+    pdf_output = IO.BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
 
-    print('MTD:%s to %s'%(u.convertEpochToUTCDT((reportingEpochs["spot-mtd"][0][0] / 1000) - (60 * 60)), u.convertEpochToUTCDT(reportingEpochs["spot-mtd"][0][1] / 1000)), file=f)
-    print('SPOT', '\n', spotMTDPnlDF, file=f)
-    f.write('\r\n')
-    print(spotMTDVolDF, file=f)
-    f.write('\r\n')
-    print('PERP', '\n', perpMTDPnlDF, file=f)
-    f.write('\r\n')
-    print(perpMTDVolDF, file=f)
-    f.write('\r\n')
-
-    f.close()
-    #
-    pdf = FPDF(format=(270, 380))
-    # run this line firstly, then can comment it.
-    pdf.add_font('Consolas4', '', fname=r'%s'%reportFontPath, uni=True)
-
-    # Add a page
-    pdf.add_page()
-    # set style and size of font
-    pdf.set_font('Consolas4', size=7)
-
-    f = open(reportTxtFilepath, "r+")
-    # insert the texts in pdf
-    for x in f:
-        pdf.cell(400, 5, txt=x.replace('\n', ''), ln=1, align='L')
-    reportPdfFilepath = reportTxtFilepath.replace(".txt",".pdf")
-    pdf.output(reportPdfFilepath)
-    pdf.close()
-    u.deleteFile(reportTxtFilepath)
-
-    ## Generate email content in html
-    # (refering to https://stackoverflow.com/questions/50564407/pandas-send-email-containing-dataframe-as-a-visual-table)
-    emailhtml = """\
-    <html>
-      <head></head>
-      <body>
-        <h1 align="left">SOD:{12} to {13}</h1>
-        <h3>SPOT</h3>
-        {0}
-        {1}
-        <h3>PERPETUAL</h3>
-        {2}
-        {3}
-        
-        <h1 align="left">HOURLY: {14} to {15}</h1>
-        <h3>SPOT</h3>
-        {4}
-        {5}
-        <h3>PERPPETUAL</h3>
-        {6}
-        {7}
-              
-        <h1 align="left">MTD: {16} to {17}</h1>
-        <h3>SPOT</h3>
-        {8}
-        {9}
-        <h3>PERPETUAL</h3>
-        {10}
-        {11}
-      
-      </body>
-    </html>
-    """.format(
-        getDFHtmlForEmail(spotSODPnlDF), getDFHtmlForEmail(spotSODVolDF), getDFHtmlForEmail(perpSODPnlDF), getDFHtmlForEmail(perpSODVolDF),
-        getDFHtmlForEmail(hourly_spotpnlsDF), getDFHtmlForEmail(hourly_spotvolsDF), getDFHtmlForEmail(hourly_perppnlsDF), getDFHtmlForEmail(hourly_perpvolsDF),
-        getDFHtmlForEmail(spotMTDPnlDF), getDFHtmlForEmail(spotMTDVolDF), getDFHtmlForEmail(perpMTDPnlDF), getDFHtmlForEmail(perpMTDVolDF),
-        u.convertEpochToUTCDT(reportingEpochs["spot-sod"][0][0]/1000-60*60),u.convertEpochToUTCDT(reportingEpochs["spot-sod"][0][1]/1000),  #spot and perp epochs will be same
-        u.convertEpochToUTCDT(reportingEpochs["spot-hourly"][0][0]/1000),u.convertEpochToUTCDT(reportingEpochs["spot-hourly"][0][1]/1000),
-        u.convertEpochToUTCDT(reportingEpochs["spot-mtd"][0][0]/1000-60*60),u.convertEpochToUTCDT(reportingEpochs["spot-mtd"][0][1]/1000)
-    )
-    return reportPdfFilepath, emailhtml
+    return pdf_output  # Return the PDF in binary format

@@ -1,34 +1,39 @@
-## credits: http://linuxcursor.com/python-programming/06-how-to-send-pdf-ppt-attachment-with-html-body-in-python-script
-## https://devpress.csdn.net/python/63045e9fc67703293080bf35.html
-from email.mime.application import MIMEApplication
+import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-import smtplib
+from email.mime.base import MIMEBase
+from email import encoders
+import os
 
-def sendEmailWithPdf(sender_email, sender_password, subject, messageHtml, recipients, path_to_pdf):
-    server = smtplib.SMTP('smtp.gmail.com', 587)
-    server.starttls()
-    server.login(sender_email, sender_password)
+def send_email_with_attachment(receiver_email, subject, body, attachment_path):
+    sender_email = "i40nervecentre@gmail.com"
+    sender_password = "mp5group2024"
+
+    # Setting up the MIME structure
     msg = MIMEMultipart()
-    msg['Subject'] = subject
     msg['From'] = sender_email
-    msg['To'] = ", ".join(recipients)
+    msg['To'] = receiver_email
+    msg['Subject'] = subject
 
-    content = MIMEText(messageHtml, "html")
-    msg.attach(content)
+    # Body of the email
+    msg.attach(MIMEText(body, 'plain'))
 
-    # Attach the pdf to the msg going by e-mail
-    with open(path_to_pdf, "rb") as f:
-        attach = MIMEApplication(f.read(), _subtype="pdf")
-    attach.add_header('Content-Disposition', 'attachment', filename=str(path_to_pdf.split("/")[-1]))
-    msg.attach(attach)
-    server.send_message(msg)
+    # Attachment
+    attachment = open(attachment_path, "rb")
+    part = MIMEBase('application', 'octet-stream')
+    part.set_payload(attachment.read())
+    encoders.encode_base64(part)
+    part.add_header('Content-Disposition', f"attachment; filename= {os.path.basename(attachment_path)}")
+    msg.attach(part)
 
-
-# sender_email = "mmreporting339509@gmail.com"
-# sender_password = "xxx"
-# subject = "AMC-OEEReport-2023-05-24 18:00"
-# message = ""
-# recipients = ["chawchia@hotmail.co.uk"]
-# path_to_pdf = "/Users/ryo.chia/Downloads/cdb47836f83442cc4ed4252069d0e2dc.pdf"
-# sendEmailWithPdf(sender_email, sender_password, subject, message, recipients, path_to_pdf)
+    # Connecting to Gmail SMTP server
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        text = msg.as_string()
+        server.sendmail(sender_email, receiver_email, text)
+        server.quit()
+        print(f"Email successfully sent to {receiver_email}")
+    except Exception as e:
+        print(f"Failed to send email to {receiver_email}. Error: {str(e)}")
