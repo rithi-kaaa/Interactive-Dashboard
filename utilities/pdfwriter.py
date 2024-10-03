@@ -22,7 +22,7 @@ def generate_charts(df, param):
     pass
 
 
-def generate_pdf_report(data):
+def generate_pdf_report(filepathandname, data):
     # Convert data to pandas DataFrame
     df = pd.DataFrame(data)
 
@@ -105,9 +105,10 @@ def generate_pdf_report(data):
         pdf.image(energy_chart, x=10, y=None, w=100)
 
     # Save PDF
-    pdf.output('i40report.pdf', 'F')
+    pdf.output(filepathandname, 'F')
     # pdf_output = IO.BytesIO()
     # pdf.output(pdf_output)
     # pdf_output.seek(0)
 
-    return pdf_output  # Return the PDF in binary format
+    return  # Return the PDF in binary format
+

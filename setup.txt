@@ -38,4 +38,7 @@ Potential Errors and resolution:
 
 
 
-
+(b) Setup gmail
+    - Create gmail and get two authentication factor turn on
+    - Search for "App password" under security
+    - use this app password and email as username and password in the config file

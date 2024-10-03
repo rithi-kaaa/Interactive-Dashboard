@@ -1785,8 +1785,9 @@ with tabs[4]:
 
         def send_report():
             data = get_data_for_report()  # Fetch data for report generation
-            pdf_filename = generate_pdf_report(data)  # Generate the PDF report
-            send_email_with_attachment(gmailConfig["sender"], gmailConfig["password"],user_email, "Your Scheduled Report", "Please find your report attached.",
+            pdf_filename = os.getcwd() + "\\report\i40report.pdf"
+            generate_pdf_report(pdf_filename, data)  # Generate the PDF report
+            send_email_with_attachment(gmailConfig["sender"], gmailConfig["password"],user_email, "AMC Scheduled Report", "Please find your report attached.",
                                        pdf_filename)  # Send the email with the PDF
 
         # Scheduling based on frequency
