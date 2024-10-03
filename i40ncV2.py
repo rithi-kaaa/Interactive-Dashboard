@@ -89,23 +89,22 @@ selected_date = st.date_input("Select Date:", latest_date)
 # Query data from MySQL for the selected date (OEE data)
 query_oee = "SELECT * FROM %s.oee_log3 WHERE DATE(Time_Stamp) = '%s'"%(database, selected_date)
 oee_data = pd.read_sql(query_oee, i40db)
-print(query_oee)
-print(oee_data)
 
 # Query data from MySQL for the last 7 days (Machine resources data)
 start_date = selected_date - timedelta(days=7)
 query_resources_7days = f"""
 SELECT * FROM {database}.machine_resources_latest
-WHERE DATE(FROM_UNIXTIME(Time_Stamp_ms/1000)) BETWEEN '{start_date}' AND '{selected_date}'
+WHERE Time_Stamp >= '{start_date} 00:00:00' AND Time_Stamp < '{selected_date} 00:00:00'
 """
 resources_data_7days = pd.read_sql(query_resources_7days, i40db)
 
+
 # Ensure the timestamp columns are in datetime format
 oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
-resources_data_7days['Time_Stamp_ms'] = pd.to_datetime(resources_data_7days['Time_Stamp_ms'], unit='ms')
+resources_data_7days['Time_Stamp'] = pd.to_datetime(resources_data_7days['Time_Stamp'])
 
 # Set the Time_Stamp_ms as the index for resampling
-resources_data_7days.set_index('Time_Stamp_ms', inplace=True)
+resources_data_7days.set_index('Time_Stamp', inplace=True)
 
 # Aggregate CO2 emissions per day over the last 7 days
 daily_co2_emissions = resources_data_7days.resample('D').sum().reset_index()
@@ -114,6 +113,8 @@ daily_co2_emissions['CO2_Emissions'] = (
     daily_co2_emissions['Comp_Air_Totalized'] * 2.31 +
     daily_co2_emissions['Water_Totalized'] * 0.0003
 )
+daily_co2_emissions['Time_Stamp'] = pd.to_datetime(daily_co2_emissions['Time_Stamp'])
+daily_co2_emissions.set_index('Time_Stamp', inplace=True)
 
 # Set values based on the data
 availability = oee_data['OEE_Availability'].mean()  # Already in percentage form
@@ -215,7 +216,9 @@ with tabs[0]:  # Production Floor Tab
 
         # Check if there's any data to plot
         if not daily_co2_emissions.empty:
-            plt.plot(daily_co2_emissions['Time_Stamp_ms'], daily_co2_emissions['CO2_Emissions'], label='CO2 Emissions',
+
+            print(daily_co2_emissions)
+            plt.plot(daily_co2_emissions['Time_Stamp'], daily_co2_emissions['CO2_Emissions'], label='CO2 Emissions',
                      color='green')
             plt.xlabel('Date')
             plt.ylabel('CO2 Emissions (kg)')
