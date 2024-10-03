@@ -13,8 +13,8 @@ Potential Errors and resolution:
     sol: install cryptography package
 
 
- To setup whole project
- (a) Setup DB
+To setup whole project
+(a) Setup DB
     (1) Open DBeaver connect to database
     (2) Open db script in Scripts folder inDBeaver, choose connection and database that script need to run upon
     (3) Click execute script: should run for 3,4 minutes.
@@ -37,8 +37,16 @@ Potential Errors and resolution:
         - Then try out in workspace thread, whether it is working to call by type in prompt: "@agent what is tables avaiable via my database connection"
 
 
-
-(b) Setup gmail
+(c) Setup gmail
     - Create gmail and get two authentication factor turn on
     - Search for "App password" under security
     - use this app password and email as username and password in the config file
+
+
+(d) Setup Slack Notification App
+    - Go to: https://api.slack.com/apps to create an app.
+       -Choose App Name and Workspace
+       -Add app scope - read write..
+       -Install to workspace
+       -Copy OAuth Token, put in config
+       -go to slack workspace, channel, add the bot into the channel

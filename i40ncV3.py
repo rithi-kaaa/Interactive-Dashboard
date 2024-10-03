@@ -33,6 +33,7 @@ from datetime import datetime
 # from email import encoders
 import streamlit.components.v1 as components
 import plotly.io as pio
+from utilities.slacknotificationmanager import slacknotificationmanager
 
 # Load database configuration from a YAML file
 with open("i40ncConfig.yml") as cfgfile:
@@ -46,6 +47,9 @@ with open("i40ncConfig.yml") as cfgfile:
 
     aLLMConfig = config["AnythingLLM"]
     gmailConfig = config["Gmail"]
+    slackConfig = config["Slack"]
+    snm = slacknotificationmanager("",slackConfig["oAuth"])
+
 
 # Create a database connection engine
 i40db = create_engine(f'mysql+pymysql://{user}:{pwd}@{host}:{port}/{database}', echo=False)
@@ -1265,24 +1269,6 @@ with tabs[2]:
 
 # ======= Smart Detect Tab =======
 with tabs[3]:
-    # st.title("Anomaly Detection")
-
-    # Initialize the Slack client with your Bot User OAuth Token
-    client = WebClient(token='xoxb-7628163592884-7628178233924-pnVLhkyUg5eustQB0sEiU3vt')
-
-
-    # Function to send an alert to Slack
-    def send_slack_alert(message):
-        try:
-            response = client.chat_postMessage(
-                channel='#alert-system',
-                text=message
-            )
-            assert response["message"]["text"] == message
-        except SlackApiError as e:
-            print(f"Error posting message to Slack: {e.response['error']}")
-
-
     # Function to load the selected model
     def load_model(model_name, model_dir):
         model_path = os.path.join(model_dir, model_name)
@@ -1730,21 +1716,21 @@ with tabs[3]:
                         for _, row in detected_anomalies.iterrows():
                             if row['energy_anomalies'] == 1:
                                 message = f"Anomaly detected at {row['Time_Stamp']}: Increased energy consumption"
-                                send_slack_alert(message)
+                                snm.slackAlert(message, slackConfig["channel"])
                                 with st.expander(message):
                                     plot = create_plot(all_data, row, 'energy')
                                     st.plotly_chart(plot)
 
                             if row['air_anomalies'] == 1:
                                 message = f"Anomaly detected at {row['Time_Stamp']}: Abnormal air consumption"
-                                send_slack_alert(message)
+                                snm.slackAlert(message, slackConfig["channel"])
                                 with st.expander(message):
                                     plot = create_plot(all_data, row, 'air')
                                     st.plotly_chart(plot)
 
                             if row['water_anomalies'] == 1:
                                 message = f"Anomaly detected at {row['Time_Stamp']}: Abnormal water consumption"
-                                send_slack_alert(message)
+                                snm.slackAlert(message,slackConfig["channel"])
                                 with st.expander(message):
                                     plot = create_plot(all_data, row, 'water')
                                     st.plotly_chart(plot)

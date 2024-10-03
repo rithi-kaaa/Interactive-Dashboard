@@ -1,6 +1,7 @@
 from slack import WebClient
 import logging
 #depends on slackclient 2.9.4
+import yaml
 
 class slacknotificationmanager:
     def __init__(self, bot, apiKey):
@@ -69,5 +70,13 @@ class slacknotificationmanager:
         return (thread)
 
 
-# snm = slacknotificationmanager("mm_alert")
+#Testing
+# with open("D:\TPProjects\i40nervecentre\i40ncConfig.yml") as cfgfile:
+#     config = yaml.load(cfgfile, Loader=yaml.FullLoader)
+#
+#     slackConfig = config["Slack"]
+#     snm = slacknotificationmanager("",slackConfig["oAuth"])
+#     snm.slackAlert("testing!!!", slackConfig["channel"])
+
+# snm = slacknotificationmanager("", "mm_alert")
 # snm.slackAlert("testing!!!","test_bot")
