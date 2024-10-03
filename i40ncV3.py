@@ -1091,7 +1091,7 @@ with tabs[0]:
                 )
 
             try:
-                query = "SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
+                query =f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
                 data = pd.read_sql(query, i40db)
                 data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
 
@@ -1124,7 +1124,7 @@ with tabs[0]:
                     end_date = st.date_input("Select end date", key='oee_end_date')
 
                 try:
-                    query_oee = "SELECT * FROM i40nc.oee_log3"
+                    query_oee = f"SELECT * FROM {database}.oee_log3"
                     oee_data = pd.read_sql(query_oee, i40db)
                     oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
 
@@ -1151,7 +1151,7 @@ with tabs[0]:
                                         key='oee_interval')
 
                 try:
-                    query_oee = "SELECT * FROM i40nc.oee_log3"
+                    query_oee = f"SELECT * FROM {database}.oee_log3"
                     oee_data = pd.read_sql(query_oee, i40db)
                     oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
 
@@ -1485,7 +1485,7 @@ with tabs[3]:
     def main():
         st.title("Anomaly Detection")
 
-        model_dir = os.getcwd()+'\models'
+        model_dir = os.getcwd()+"\models"
 
         if 'selected_anomaly' not in st.session_state:
             st.session_state.selected_anomaly = None
@@ -1839,10 +1839,10 @@ with tabs[4]:
         import mysql.connector
 
         conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="password",
-            database="i40nc"
+            host= host,
+            user= user,
+            password= pwd,
+            database= database
         )
 
         query = "SELECT * FROM machine_resources_latest WHERE Time_Stamp >= NOW() - INTERVAL 1 DAY"
