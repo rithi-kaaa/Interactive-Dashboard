@@ -35,6 +35,7 @@ To setup whole project
               -Database: i40ncv1
     (4) Save Connection save all
         - Then try out in workspace thread, whether it is working to call by type in prompt: "@agent what is tables avaiable via my database connection"
+        *url should use all lower case event thought workspace defined as upper case: e.g. in config: "http://localhost:3001/api/v1/workspace/test"
 
 
 (c) Setup gmail
