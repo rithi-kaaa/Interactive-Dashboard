@@ -44,6 +44,9 @@ with open("i40ncConfig.yml") as cfgfile:
     host = dbConfig["uri"]
     port = dbConfig["port"]
 
+    aLLMConfig = config["AnythingLLM"]
+    gmailConfig = config["Gmail"]
+
 # Create a database connection engine
 i40db = create_engine(f'mysql+pymysql://{user}:{pwd}@{host}:{port}/{database}', echo=False)
 
@@ -1220,9 +1223,10 @@ with tabs[2]:
     if send_button:
         if prompt:
             st.session_state.messages.append({"role": "user", "content": prompt})
-            url_3 = 'http://localhost:3001/api/v1/workspace/major-project/chat'
+            url_3 = aLLMConfig["url"]+'/chat'
+            print(url_3)
             data_3 = {'message': additional_context + prompt, 'mode': 'chat'}
-            headers_3 = {'Authorization': 'Bearer K8QE7DN-5AVMERW-PVFP5N7-9HRMVZ7', 'Accept': 'application/json'}
+            headers_3 = {'Authorization':  aLLMConfig["Authorization"], 'Accept': 'application/json'}
             response_data_3 = post_request(url_3, data_3, headers_3)
             assistant_message = response_data_3['textResponse']
             if assistant_message == 'True':
@@ -1782,11 +1786,13 @@ with tabs[4]:
         def send_report():
             data = get_data_for_report()  # Fetch data for report generation
             pdf_filename = generate_pdf_report(data)  # Generate the PDF report
-            send_email_with_attachment(user_email, "Your Scheduled Report", "Please find your report attached.",
+            send_email_with_attachment(gmailConfig["sender"], gmailConfig["password"],user_email, "Your Scheduled Report", "Please find your report attached.",
                                        pdf_filename)  # Send the email with the PDF
 
         # Scheduling based on frequency
-        if report_frequency == 'daily':
+        if report_frequency == 'minute':
+            schedule.every(1).minutes.do(send_report)
+        elif report_frequency == 'daily':
             schedule.every().day.at(report_time_str).do(send_report)
         elif report_frequency == 'weekly':
             schedule.every().week.do(send_report)  # Weekly does not support specific times, adjust if needed
@@ -1811,7 +1817,7 @@ with tabs[4]:
         report_time = st.time_input("Select report time", datetime.now().time())
 
         # Select report frequency (daily, weekly, etc.)
-        frequency_options = ['daily', 'weekly', 'monthly', 'yearly']
+        frequency_options = ['minute', 'daily', 'weekly', 'monthly', 'yearly']
         report_frequency = st.selectbox("Select report frequency", frequency_options)
 
         # Submit button to confirm the scheduling

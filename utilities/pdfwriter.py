@@ -1,4 +1,4 @@
-import PDFReport
+#import PDFReport
 from fpdf import FPDF
 from datetime import datetime
 import traceback
@@ -32,7 +32,7 @@ def generate_pdf_report(data):
     Water_Totalized = df.get('Water_Totalized', pd.Series([0]))
 
     # Create a PDF object
-    pdf = PDFReport()
+    pdf = FPDF()
     pdf.add_page()
 
     # Executive Summary
@@ -105,8 +105,9 @@ def generate_pdf_report(data):
         pdf.image(energy_chart, x=10, y=None, w=100)
 
     # Save PDF
-    pdf_output = IO.BytesIO()
-    pdf.output(pdf_output)
-    pdf_output.seek(0)
+    pdf.output('i40report.pdf', 'F')
+    # pdf_output = IO.BytesIO()
+    # pdf.output(pdf_output)
+    # pdf_output.seek(0)
 
     return pdf_output  # Return the PDF in binary format

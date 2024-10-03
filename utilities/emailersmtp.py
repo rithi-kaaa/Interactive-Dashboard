@@ -5,9 +5,9 @@ from email.mime.base import MIMEBase
 from email import encoders
 import os
 
-def send_email_with_attachment(receiver_email, subject, body, attachment_path):
-    sender_email = "i40nervecentre@gmail.com"
-    sender_password = "mp5group2024"
+def send_email_with_attachment(sender, senderPW, receiver_email, subject, body, attachment_path):
+    sender_email =  sender
+    sender_password = senderPW
 
     # Setting up the MIME structure
     msg = MIMEMultipart()
