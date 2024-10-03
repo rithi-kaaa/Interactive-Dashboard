@@ -117,7 +117,7 @@ with tabs[0]:
     }
 
     # Get the latest date in the data for OEE
-    query_latest_date = "SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM i40nc.oee_log3"
+    query_latest_date = f"SELECT MAX(DATE(Time_Stamp)) AS latest_date FROM {database}.oee_log3"
     latest_date = pd.read_sql(query_latest_date, i40db)['latest_date'][0]
 
     # Date selector
@@ -125,7 +125,7 @@ with tabs[0]:
 
     # Fetch OEE data for the selected date
     query_oee = f"""
-           SELECT * FROM i40nc.oee_log3
+           SELECT * FROM {database}.oee_log3
            WHERE DATE(Time_Stamp) = '{selected_date}'
            """
     oee_data = pd.read_sql(query_oee, i40db)
@@ -137,7 +137,7 @@ with tabs[0]:
     # Fetch CO2 data for the selected day using the Time_Stamp column
     query_co2 = f"""
            SELECT Time_Stamp, CO2_Comp_Air, CO2_Water, CO2_EEnergy 
-           FROM i40nc.machine_resources_co2
+           FROM {database}.machine_resources_co2
            WHERE DATE(Time_Stamp) = '{selected_date}'
            """
     co2_data = pd.read_sql(query_co2, i40db)
@@ -148,7 +148,7 @@ with tabs[0]:
         st.stop()
 
     # Fetch OEE data for visualization over time on the two available dates
-    query_oee_time = """
+    query_oee_time = f"""
             SELECT
                 Time_Stamp,
                 OEE_Availability,
@@ -156,7 +156,7 @@ with tabs[0]:
                 OEE_Quality,
                 (OEE_Availability * OEE_Performance * OEE_Quality) / 10000 AS OEE
             FROM
-                i40nc.oee_log3
+                {database}.oee_log3
             WHERE
                 DATE(Time_Stamp) IN ('2024-08-29', '2024-09-02')
             ORDER BY
