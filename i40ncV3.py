@@ -1289,10 +1289,10 @@ with tabs[3]:
     # Function to connect to the database
     def connect_to_db():
         return mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="password",
-            database="i40nc"
+            host=host,
+            user=user,
+            password=pwd,
+            database=database
         )
 
 
