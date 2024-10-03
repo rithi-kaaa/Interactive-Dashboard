@@ -12,3 +12,30 @@ Potential Errors and resolution:
 (1) 'cryptography' package is required for sha256_password or caching_sha2_password auth methods
     sol: install cryptography package
 
+
+ To setup whole project
+ (a) Setup DB
+    (1) Open DBeaver connect to database
+    (2) Open db script in Scripts folder inDBeaver, choose connection and database that script need to run upon
+    (3) Click execute script: should run for 3,4 minutes.
+    (4) See the imported tables: only use 3 final tables oee_log3, machine_resources_latest and machine_resources_co2 , the rest delete
+
+(b) Setup AnythingLLM
+    (1) Download AnythingLLM in targeted server.
+    (2) "Configure Agent Skills" for workspace
+    (3) Create a connection:
+        (i) SQL Connector - Turn on agent
+        (ii) +New SQL Connection
+              -Choose "MySQL"
+              -Connection Name: ConnectToI40NCV1
+              -Database User: user  (create a new user credential in db)
+              -Password: password
+              -Server endpoint: 127.0.0.1
+              -Port: 3306
+              -Database: i40ncv1
+    (4) Save Connection save all
+        - Then try out in workspace thread, whether it is working to call by type in prompt: "@agent what is tables avaiable via my database connection"
+
+
+
+
