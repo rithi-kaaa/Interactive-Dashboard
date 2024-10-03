@@ -991,184 +991,186 @@ with tabs[0]:
     st.markdown('</div>', unsafe_allow_html=True)
 
     # ======= Past Performance =======
-    with tabs[1]:
-        st.title("Past Performance")
-        # Subtabs for "Past Performance"
-        subtab1, subtab2, subtab3 = st.tabs(["SPC Analysis", "Machine Data", "OEE Data"])
 
-        # Subtab 1: SPC Analysis
-        with subtab1:
-            st.markdown("""
-                <style>
-                div.row-widget.stRadio > div{ flex-direction: row!important; }
-                label {font-weight: bold;}
-                </style>
-            """, unsafe_allow_html=True)
+# ======= Past Performance =======
+with tabs[1]:
+    st.title("Past Performance")
+    # Subtabs for "Past Performance"
+    subtab1, subtab2, subtab3 = st.tabs(["SPC Analysis", "Machine Data", "OEE Data"])
 
-            col1, col2 = st.columns([1, 1])
+    # Subtab 1: SPC Analysis
+    with subtab1:
+        st.markdown("""
+            <style>
+            div.row-widget.stRadio > div{ flex-direction: row!important; }
+            label {font-weight: bold;}
+            </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            filter_choice = st.radio("Choose Filter Method", ['Date Range', 'Time Interval'],
+                                     key="spc_filter_choice")
+
+        if filter_choice == 'Date Range':
+            col3, col4 = st.columns([1, 1])
+            with col3:
+                start_date = st.date_input("Select start date", key='spc_start_date')
+            with col4:
+                end_date = st.date_input("Select end date", key='spc_end_date')
+        elif filter_choice == 'Time Interval':
+            interval = st.selectbox("Select Time Interval for Aggregation",
+                                    ['H', 'D', 'W', 'M', 'Y'],
+                                    format_func=lambda x:
+                                    {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[x],
+                                    key='spc_interval')
+
+        try:
+            query = f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
+            data = pd.read_sql(query, i40db)
+            data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
+
+            if not data.empty:
+                col5, col6, col7 = st.columns([2, 1, 1])
+                with col5:
+                    feature = st.selectbox('Select Feature for SPC Analysis',
+                                           options=data.columns.difference(['timestamp', 'Time_Stamp']))
+                with col6:
+                    custom_ucl = st.number_input("Enter Custom UCL (optional)", value=0.0)
+                with col7:
+                    custom_lcl = st.number_input("Enter Custom LCL (optional)", value=0.0)
+
+                filtered_data = apply_filter(data, filter_choice, 'spc')
+                cl, ucl, lcl = calculate_control_limits(filtered_data, feature, custom_ucl, custom_lcl)
+                cp, cpk = process_capability_analysis(filtered_data, feature, ucl, lcl)
+
+                # Rendering the SPC chart
+                fig = render_spc_chart(filtered_data, feature, ucl, lcl, cl)
+                render_plotly_chart_with_drawing(fig)  # Enables annotations on the chart
+                st.plotly_chart(fig, use_container_width=True)
+
+                # Buttons for clearing annotations and generating reports
+                col8, col9 = st.columns([1, 1])
+                with col8:
+                    if st.button("Clear Annotations"):
+                        st.experimental_rerun()  # Refresh the page to simulate clearing the annotations
+                with col9:
+                    if st.button('Generate SPC Report'):
+                        report_path = generate_spc_report(feature, cl, ucl, lcl, cp, cpk)
+                        with st.expander("View SPC Report"):
+                            with open(report_path, "rb") as file:
+                                st.download_button("Download SPC Report", data=file, file_name=report_path,
+                                                   mime="application/pdf")
+                        st.success("SPC Report generated and ready for download.")
+
+        except Exception as e:
+            st.error(f"Error fetching data from the database: {str(e)}")
+
+    # Subtab 2: Machine Data
+    with subtab2:
+        st.markdown('<div class="sub-header">Machine Data</div>', unsafe_allow_html=True)
+
+        filter_choice = st.radio(
+            "Choose Filter Method",
+            ['Date Range', 'Time Interval'],
+            key='machine_data_filter_choice'
+        )
+
+        # Define the filter UI elements based on the selected method
+        if filter_choice == 'Date Range':
+            col1, col2 = st.columns(2)
             with col1:
-                filter_choice = st.radio("Choose Filter Method", ['Date Range', 'Time Interval'],
-                                         key="spc_filter_choice")
-
-            if filter_choice == 'Date Range':
-                col3, col4 = st.columns([1, 1])
-                with col3:
-                    start_date = st.date_input("Select start date", key='spc_start_date')
-                with col4:
-                    end_date = st.date_input("Select end date", key='spc_end_date')
-            elif filter_choice == 'Time Interval':
-                interval = st.selectbox("Select Time Interval for Aggregation",
-                                        ['H', 'D', 'W', 'M', 'Y'],
-                                        format_func=lambda x:
-                                        {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[x],
-                                        key='spc_interval')
-
-            try:
-                query = f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
-                data = pd.read_sql(query, i40db)
-                data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
-
-                if not data.empty:
-                    col5, col6, col7 = st.columns([2, 1, 1])
-                    with col5:
-                        feature = st.selectbox('Select Feature for SPC Analysis',
-                                               options=data.columns.difference(['timestamp', 'Time_Stamp']))
-                    with col6:
-                        custom_ucl = st.number_input("Enter Custom UCL (optional)", value=0.0)
-                    with col7:
-                        custom_lcl = st.number_input("Enter Custom LCL (optional)", value=0.0)
-
-                    filtered_data = apply_filter(data, filter_choice, 'spc')
-                    cl, ucl, lcl = calculate_control_limits(filtered_data, feature, custom_ucl, custom_lcl)
-                    cp, cpk = process_capability_analysis(filtered_data, feature, ucl, lcl)
-
-                    # Rendering the SPC chart
-                    fig = render_spc_chart(filtered_data, feature, ucl, lcl, cl)
-                    render_plotly_chart_with_drawing(fig)  # Enables annotations on the chart
-                    st.plotly_chart(fig, use_container_width=True)
-
-                    # Buttons for clearing annotations and generating reports
-                    col8, col9 = st.columns([1, 1])
-                    with col8:
-                        if st.button("Clear Annotations"):
-                            st.experimental_rerun()  # Refresh the page to simulate clearing the annotations
-                    with col9:
-                        if st.button('Generate SPC Report'):
-                            report_path = generate_spc_report(feature, cl, ucl, lcl, cp, cpk)
-                            with st.expander("View SPC Report"):
-                                with open(report_path, "rb") as file:
-                                    st.download_button("Download SPC Report", data=file, file_name=report_path,
-                                                       mime="application/pdf")
-                            st.success("SPC Report generated and ready for download.")
-
-            except Exception as e:
-                st.error(f"Error fetching data from the database: {str(e)}")
-
-        # Subtab 2: Machine Data
-        with subtab2:
-            st.markdown('<div class="sub-header">Machine Data</div>', unsafe_allow_html=True)
-
-            filter_choice = st.radio(
-                "Choose Filter Method",
-                ['Date Range', 'Time Interval'],
-                key='machine_data_filter_choice'
+                start_date = st.date_input("Select start date", key='machine_data_start_date')
+            with col2:
+                end_date = st.date_input("Select end date", key='machine_data_end_date')
+        else:
+            interval = st.selectbox(
+                "Select Time Interval for Aggregation",
+                ['H', 'D', 'W', 'M', 'Y'],  # Hourly, Daily, Weekly, Monthly, Yearly
+                format_func=lambda x: {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[
+                    x],
+                key='machine_data_interval'
             )
 
-            # Define the filter UI elements based on the selected method
-            if filter_choice == 'Date Range':
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_date = st.date_input("Select start date", key='machine_data_start_date')
-                with col2:
-                    end_date = st.date_input("Select end date", key='machine_data_end_date')
+        try:
+            query =f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
+            data = pd.read_sql(query, i40db)
+            data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
+
+            if data.empty:
+                st.warning("No data found.")
             else:
-                interval = st.selectbox(
-                    "Select Time Interval for Aggregation",
-                    ['H', 'D', 'W', 'M', 'Y'],  # Hourly, Daily, Weekly, Monthly, Yearly
-                    format_func=lambda x: {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[
-                        x],
-                    key='machine_data_interval'
-                )
+                # Adjust the apply_filter call as needed
+                filtered_data = apply_filter(data, filter_choice, 'machine_data')
+                if filter_choice == 'Date Range':
+                    plot_date_range(filtered_data)
+                elif filter_choice == 'Time Interval':
+                    plot_time_interval(filtered_data)
+
+        except Exception as e:
+            st.error("Error fetching Machine data from the database.")
+            st.write(str(e))
+
+    # Subtab 3: OEE Data
+    # Subtab 3: OEE Data
+    with subtab3:
+        st.markdown('<div class="sub-header">OEE Data</div>', unsafe_allow_html=True)
+
+        filter_choice = st.radio("Choose Filter Method", ['Date Range', 'Time Interval'], key="oee_filter_choice")
+
+        if filter_choice == 'Date Range':
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Select start date", key='oee_start_date')
+            with col2:
+                end_date = st.date_input("Select end date", key='oee_end_date')
 
             try:
-                query =f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
-                data = pd.read_sql(query, i40db)
-                data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
+                query_oee = f"SELECT * FROM {database}.oee_log3"
+                oee_data = pd.read_sql(query_oee, i40db)
+                oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
 
-                if data.empty:
-                    st.warning("No data found.")
-                else:
-                    # Adjust the apply_filter call as needed
-                    filtered_data = apply_filter(data, filter_choice, 'machine_data')
-                    if filter_choice == 'Date Range':
-                        plot_date_range(filtered_data)
-                    elif filter_choice == 'Time Interval':
-                        plot_time_interval(filtered_data)
+                if oee_data.empty:
+                    st.warning("No OEE data found.")
+                    st.stop()
+
+                filtered_data = apply_filter(oee_data, filter_choice, 'oee_data')
+                if filtered_data.empty:
+                    st.warning("No data found for the selected range.")
+                    st.stop()
+
+                plot_oee_date_range(filtered_data)
 
             except Exception as e:
-                st.error("Error fetching Machine data from the database.")
-                st.write(str(e))
+                st.error("Error fetching or processing OEE data from the database.")
+                st.exception(e)
 
-        # Subtab 3: OEE Data
-        # Subtab 3: OEE Data
-        with subtab3:
-            st.markdown('<div class="sub-header">OEE Data</div>', unsafe_allow_html=True)
+        elif filter_choice == 'Time Interval':
+            interval = st.selectbox("Select Time Interval for Aggregation",
+                                    ['H', 'D', 'W', 'M', 'Y'],  # Hourly, Daily, Weekly, Monthly, Yearly
+                                    format_func=lambda x:
+                                    {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[x],
+                                    key='oee_interval')
 
-            filter_choice = st.radio("Choose Filter Method", ['Date Range', 'Time Interval'], key="oee_filter_choice")
+            try:
+                query_oee = f"SELECT * FROM {database}.oee_log3"
+                oee_data = pd.read_sql(query_oee, i40db)
+                oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
 
-            if filter_choice == 'Date Range':
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_date = st.date_input("Select start date", key='oee_start_date')
-                with col2:
-                    end_date = st.date_input("Select end date", key='oee_end_date')
+                if oee_data.empty:
+                    st.warning("No OEE data found.")
+                    st.stop()
 
-                try:
-                    query_oee = f"SELECT * FROM {database}.oee_log3"
-                    oee_data = pd.read_sql(query_oee, i40db)
-                    oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
+                filtered_data = apply_filter(oee_data, filter_choice, 'oee_data')
+                if filtered_data.empty:
+                    st.warning("No data found after filtering.")
+                    st.stop()
 
-                    if oee_data.empty:
-                        st.warning("No OEE data found.")
-                        st.stop()
+                plot_time_interval_oee(filtered_data, interval)
 
-                    filtered_data = apply_filter(oee_data, filter_choice, 'oee_data')
-                    if filtered_data.empty:
-                        st.warning("No data found for the selected range.")
-                        st.stop()
-
-                    plot_oee_date_range(filtered_data)
-
-                except Exception as e:
-                    st.error("Error fetching or processing OEE data from the database.")
-                    st.exception(e)
-
-            elif filter_choice == 'Time Interval':
-                interval = st.selectbox("Select Time Interval for Aggregation",
-                                        ['H', 'D', 'W', 'M', 'Y'],  # Hourly, Daily, Weekly, Monthly, Yearly
-                                        format_func=lambda x:
-                                        {'H': 'Hourly', 'D': 'Daily', 'W': 'Weekly', 'M': 'Monthly', 'Y': 'Yearly'}[x],
-                                        key='oee_interval')
-
-                try:
-                    query_oee = f"SELECT * FROM {database}.oee_log3"
-                    oee_data = pd.read_sql(query_oee, i40db)
-                    oee_data['Time_Stamp'] = pd.to_datetime(oee_data['Time_Stamp'])
-
-                    if oee_data.empty:
-                        st.warning("No OEE data found.")
-                        st.stop()
-
-                    filtered_data = apply_filter(oee_data, filter_choice, 'oee_data')
-                    if filtered_data.empty:
-                        st.warning("No data found after filtering.")
-                        st.stop()
-
-                    plot_time_interval_oee(filtered_data, interval)
-
-                except Exception as e:
-                    st.error("Error fetching or processing OEE data from the database.")
-                    st.exception(e)
+            except Exception as e:
+                st.error("Error fetching or processing OEE data from the database.")
+                st.exception(e)
 
 # ======= Ask NerCy Tab =======
 with tabs[2]:
@@ -1256,7 +1258,6 @@ with tabs[2]:
     if st.button('Clear Chat History'):
         st.session_state.messages = []
         st.rerun()
-
 
 # ======= Smart Detect Tab =======
 with tabs[3]:
