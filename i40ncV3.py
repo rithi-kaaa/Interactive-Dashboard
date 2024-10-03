@@ -1024,7 +1024,7 @@ with tabs[0]:
                                         key='spc_interval')
 
             try:
-                query = "SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM i40nc.machine_resources_latest"
+                query = f"SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
                 data = pd.read_sql(query, i40db)
                 data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
 
@@ -1091,7 +1091,7 @@ with tabs[0]:
                 )
 
             try:
-                query = "SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM i40nc.machine_resources_latest"
+                query = "SELECT Time_Stamp, Comp_Air_Totalized, Water_Totalized, kwh_actual_with_sim FROM {database}.machine_resources_latest"
                 data = pd.read_sql(query, i40db)
                 data['timestamp'] = pd.to_datetime(data['Time_Stamp'])
 
