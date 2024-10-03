@@ -393,12 +393,12 @@ with tabs[0]:
         # Fetch data for the selected dates
         query1 = f"""
             SELECT Time_Stamp, {', '.join(selected_emissions)}
-            FROM i40nc.machine_resources_co2
+            FROM {database}.machine_resources_co2
             WHERE DATE(Time_Stamp) = '{date1.strftime('%Y-%m-%d')}'
         """
         query2 = f"""
             SELECT Time_Stamp, {', '.join(selected_emissions)}
-            FROM i40nc.machine_resources_co2
+            FROM {database}.machine_resources_co2
             WHERE DATE(Time_Stamp) = '{date2.strftime('%Y-%m-%d')}'
         """
         co2_data_date1 = pd.read_sql(query1, i40db)
@@ -1485,7 +1485,7 @@ with tabs[3]:
     def main():
         st.title("Anomaly Detection")
 
-        model_dir = 'C:\Program Files\i40nervecentre\models'
+        model_dir = os.getcwd()+'\models'
 
         if 'selected_anomaly' not in st.session_state:
             st.session_state.selected_anomaly = None
