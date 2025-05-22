@@ -26,11 +26,6 @@ import streamlit as st
 import schedule
 import time
 from datetime import datetime
-# import smtplib
-# from email.mime.multipart import MIMEMultipart
-# from email.mime.text import MIMEText
-# from email.mime.base import MIMEBase
-# from email import encoders
 import streamlit.components.v1 as components
 import plotly.io as pio
 from utilities.slacknotificationmanager import slacknotificationmanager
